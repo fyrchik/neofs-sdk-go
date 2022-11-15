@@ -2151,11 +2151,6 @@ type ResGetObject struct {
 //
 // Main return value MUST NOT be processed on an erroneous return.
 func (p *Pool) GetObject(ctx context.Context, prm PrmObjectGet) (ResGetObject, error) {
-	var prmCtx prmContext
-	prmCtx.useDefaultSession()
-	prmCtx.useVerb(session.VerbObjectGet)
-	prmCtx.useAddress(prm.addr)
-
 	p.fillAppropriateKey(&prm.prmCommon)
 
 	var cc callContext
@@ -2164,7 +2159,7 @@ func (p *Pool) GetObject(ctx context.Context, prm PrmObjectGet) (ResGetObject, e
 
 	var res ResGetObject
 
-	err := p.initCallContext(&cc, prm.prmCommon, prmCtx)
+	err := p.initCallContext(&cc, prm.prmCommon, prmContext{})
 	if err != nil {
 		return res, err
 	}
@@ -2179,11 +2174,6 @@ func (p *Pool) GetObject(ctx context.Context, prm PrmObjectGet) (ResGetObject, e
 //
 // Main return value MUST NOT be processed on an erroneous return.
 func (p *Pool) HeadObject(ctx context.Context, prm PrmObjectHead) (object.Object, error) {
-	var prmCtx prmContext
-	prmCtx.useDefaultSession()
-	prmCtx.useVerb(session.VerbObjectHead)
-	prmCtx.useAddress(prm.addr)
-
 	p.fillAppropriateKey(&prm.prmCommon)
 
 	var cc callContext
@@ -2193,7 +2183,7 @@ func (p *Pool) HeadObject(ctx context.Context, prm PrmObjectHead) (object.Object
 
 	var obj object.Object
 
-	err := p.initCallContext(&cc, prm.prmCommon, prmCtx)
+	err := p.initCallContext(&cc, prm.prmCommon, prmContext{})
 	if err != nil {
 		return obj, err
 	}
@@ -2234,11 +2224,6 @@ func (x *ResObjectRange) Close() error {
 //
 // Main return value MUST NOT be processed on an erroneous return.
 func (p *Pool) ObjectRange(ctx context.Context, prm PrmObjectRange) (ResObjectRange, error) {
-	var prmCtx prmContext
-	prmCtx.useDefaultSession()
-	prmCtx.useVerb(session.VerbObjectRange)
-	prmCtx.useAddress(prm.addr)
-
 	p.fillAppropriateKey(&prm.prmCommon)
 
 	var cc callContext
@@ -2247,7 +2232,7 @@ func (p *Pool) ObjectRange(ctx context.Context, prm PrmObjectRange) (ResObjectRa
 
 	var res ResObjectRange
 
-	err := p.initCallContext(&cc, prm.prmCommon, prmCtx)
+	err := p.initCallContext(&cc, prm.prmCommon, prmContext{})
 	if err != nil {
 		return res, err
 	}
@@ -2301,11 +2286,6 @@ func (x *ResObjectSearch) Close() {
 //
 // Main return value MUST NOT be processed on an erroneous return.
 func (p *Pool) SearchObjects(ctx context.Context, prm PrmObjectSearch) (ResObjectSearch, error) {
-	var prmCtx prmContext
-	prmCtx.useDefaultSession()
-	prmCtx.useVerb(session.VerbObjectSearch)
-	prmCtx.useContainer(prm.cnrID)
-
 	p.fillAppropriateKey(&prm.prmCommon)
 
 	var cc callContext
@@ -2315,7 +2295,7 @@ func (p *Pool) SearchObjects(ctx context.Context, prm PrmObjectSearch) (ResObjec
 
 	var res ResObjectSearch
 
-	err := p.initCallContext(&cc, prm.prmCommon, prmCtx)
+	err := p.initCallContext(&cc, prm.prmCommon, prmContext{})
 	if err != nil {
 		return res, err
 	}
