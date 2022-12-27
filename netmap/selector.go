@@ -47,7 +47,7 @@ func calcNodesCount(s netmap.Selector) (int, int) {
 }
 
 // calcBucketWeight computes weight for a node bucket.
-func calcBucketWeight(ns nodes, a aggregator, wf weightFunc) float64 {
+func calcBucketWeight(ns nodes, a aggregator, wf WeightFunc) float64 {
 	for i := range ns {
 		a.Add(wf(ns[i]))
 	}

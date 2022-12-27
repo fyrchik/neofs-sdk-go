@@ -114,7 +114,7 @@ func (n nodes) Hash() uint64 {
 }
 
 // weights returns slice of nodes weights W.
-func (n nodes) weights(wf weightFunc) []float64 {
+func (n nodes) weights(wf WeightFunc) []float64 {
 	w := make([]float64, 0, len(n))
 	for i := range n {
 		w = append(w, wf(n[i]))
@@ -145,8 +145,11 @@ func flattenNodes(ns []nodes) nodes {
 // object identifier can be used as pivot. Result is deterministic for
 // the fixed NetMap and parameters.
 func (m NetMap) PlacementVectors(vectors [][]NodeInfo, pivot []byte) ([][]NodeInfo, error) {
+	return m.WeightedPlacementVectors(vectors, pivot, defaultWeightFunc(m.nodes))
+}
+
+func (m NetMap) WeightedPlacementVectors(vectors [][]NodeInfo, pivot []byte, wf WeightFunc) ([][]NodeInfo, error) {
 	h := hrw.Hash(pivot)
-	wf := defaultWeightFunc(m.nodes)
 	result := make([][]NodeInfo, len(vectors))
 
 	for i := range vectors {

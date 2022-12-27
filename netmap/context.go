@@ -31,7 +31,7 @@ type context struct {
 
 	// weightFunc is a weighting function for determining node priority
 	// which combines low price and high performance
-	weightFunc weightFunc
+	weightFunc WeightFunc
 
 	// container backup factor
 	cbf uint32
@@ -76,7 +76,7 @@ func (c *context) setCBF(cbf uint32) {
 	}
 }
 
-func defaultWeightFunc(ns nodes) weightFunc {
+func defaultWeightFunc(ns nodes) WeightFunc {
 	mean := newMeanAgg()
 	min := newMinAgg()
 

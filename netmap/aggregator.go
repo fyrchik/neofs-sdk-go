@@ -39,8 +39,8 @@ type (
 		scale float64
 	}
 
-	// weightFunc calculates n's weight.
-	weightFunc = func(NodeInfo) float64
+	// WeightFunc calculates n's weight.
+	WeightFunc = func(NodeInfo) float64
 )
 
 var (
@@ -52,9 +52,9 @@ var (
 	_ normalizer = (*sigmoidNorm)(nil)
 )
 
-// newWeightFunc returns weightFunc which multiplies normalized
+// newWeightFunc returns WeightFunc which multiplies normalized
 // capacity and price.
-func newWeightFunc(capNorm, priceNorm normalizer) weightFunc {
+func newWeightFunc(capNorm, priceNorm normalizer) WeightFunc {
 	return func(n NodeInfo) float64 {
 		return capNorm.Normalize(float64(n.capacity())) * priceNorm.Normalize(float64(n.Price()))
 	}
