@@ -2,6 +2,7 @@ package netmap
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/nspcc-dev/hrw"
 	"github.com/nspcc-dev/neofs-api-go/v2/netmap"
@@ -149,13 +150,22 @@ func (m NetMap) PlacementVectors(vectors [][]NodeInfo, pivot []byte) ([][]NodeIn
 }
 
 func (m NetMap) WeightedPlacementVectors(vectors [][]NodeInfo, pivot []byte, wf WeightFunc) ([][]NodeInfo, error) {
-	h := hrw.Hash(pivot)
+	var h uint64
+	if pivot != nil {
+		h = hrw.Hash(pivot)
+	}
 	result := make([][]NodeInfo, len(vectors))
 
 	for i := range vectors {
 		result[i] = make([]NodeInfo, len(vectors[i]))
 		copy(result[i], vectors[i])
-		hrw.SortSliceByWeightValue(result[i], nodes(result[i]).weights(wf), h)
+		if pivot != nil {
+			hrw.SortSliceByWeightValue(result[i], nodes(result[i]).weights(wf), h)
+		} else {
+			sort.Slice(result[i], func(a, b int) bool {
+				return wf(result[i][a]) > wf(result[i][b])
+			})
+		}
 	}
 
 	return result, nil
