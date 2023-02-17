@@ -200,11 +200,11 @@ func (s *payloadSizeLimiter) release(finalize bool) (*AccessIdentifiers, error) 
 	}
 
 	// save identifier of the released object
-	s.previous = append(s.previous, ids.SelfID())
+	s.previous = append(s.previous, ids.SelfID)
 
 	if withParent {
 		// generate and release linking object
-		s.initializeLinking(ids.Parent())
+		s.initializeLinking(ids.ParentHeader)
 		s.initializeCurrent()
 
 		if _, err := s.release(false); err != nil {

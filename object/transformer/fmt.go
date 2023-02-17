@@ -109,8 +109,9 @@ func (f *formatter) Close() (*AccessIdentifiers, error) {
 
 	id, _ := f.obj.ID()
 
-	return new(AccessIdentifiers).
-		WithSelfID(id).
-		WithParentID(parID).
-		WithParent(parHdr), nil
+	return &AccessIdentifiers{
+		ParentID:     parID,
+		SelfID:       id,
+		ParentHeader: parHdr,
+	}, nil
 }

@@ -56,7 +56,7 @@ func TestTransformer(t *testing.T) {
 		case 3:
 			parID, ok := tt.objects[i].ParentID()
 			require.True(t, ok)
-			require.Equal(t, ids.ParentID(), &parID)
+			require.Equal(t, ids.ParentID, &parID)
 		}
 	}
 	require.Equal(t, expectedPayload, actualPayload)
