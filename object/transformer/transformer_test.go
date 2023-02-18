@@ -105,12 +105,12 @@ func newPayloadSizeLimiter(maxSize uint64, nextTarget ObjectTarget) (ObjectTarge
 		panic(err)
 	}
 
-	return NewPayloadSizeLimiter(maxSize, true, func() ObjectTarget {
-		return NewFormatTarget(&FormatterParams{
-			Key:          &p.PrivateKey,
-			NextTarget:   nextTarget,
-			NetworkState: dummyEpochSource(123),
-		})
+	return NewPayloadSizeLimiter(Params{
+		Key:                    &p.PrivateKey,
+		NextTarget:             nextTarget,
+		NetworkState:           dummyEpochSource(123),
+		MaxSize:                maxSize,
+		WithoutHomomorphicHash: true,
 	}), p
 }
 
