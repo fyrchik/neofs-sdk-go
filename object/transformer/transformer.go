@@ -229,45 +229,46 @@ func (s *payloadSizeLimiter) initializeLinking(parHdr *object.Object) {
 }
 
 func (s *payloadSizeLimiter) writeChunk(chunk []byte) error {
-	// statement is true if the previous write of bytes reached exactly the boundary.
-	if s.written > 0 && s.written%s.maxSize == 0 {
-		if s.written == s.maxSize {
-			s.prepareFirstChild()
+	for {
+		// statement is true if the previous write of bytes reached exactly the boundary.
+		if s.written > 0 && s.written%s.maxSize == 0 {
+			if s.written == s.maxSize {
+				s.prepareFirstChild()
+			}
+
+			// we need to release current object
+			if _, err := s.release(false); err != nil {
+				return fmt.Errorf("could not release object: %w", err)
+			}
+
+			// initialize another object
+			s.initialize()
 		}
 
-		// we need to release current object
-		if _, err := s.release(false); err != nil {
-			return fmt.Errorf("could not release object: %w", err)
+		var (
+			ln         = uint64(len(chunk))
+			cut        = ln
+			leftToEdge = s.maxSize - s.written%s.maxSize
+		)
+
+		// write bytes no further than the boundary of the current object
+		if ln > leftToEdge {
+			cut = leftToEdge
 		}
 
-		// initialize another object
-		s.initialize()
+		if _, err := s.chunkWriter.Write(chunk[:cut]); err != nil {
+			return fmt.Errorf("could not write chunk to target: %w", err)
+		}
+
+		// increase written bytes counter
+		s.written += cut
+
+		if cut == ln {
+			return nil
+		}
+		// if there are more bytes in buffer we call method again to start filling another object
+		chunk = chunk[cut:]
 	}
-
-	var (
-		ln         = uint64(len(chunk))
-		cut        = ln
-		leftToEdge = s.maxSize - s.written%s.maxSize
-	)
-
-	// write bytes no further than the boundary of the current object
-	if ln > leftToEdge {
-		cut = leftToEdge
-	}
-
-	if _, err := s.chunkWriter.Write(chunk[:cut]); err != nil {
-		return fmt.Errorf("could not write chunk to target: %w", err)
-	}
-
-	// increase written bytes counter
-	s.written += cut
-
-	// if there are more bytes in buffer we call method again to start filling another object
-	if ln > leftToEdge {
-		return s.writeChunk(chunk[cut:])
-	}
-
-	return nil
 }
 
 func (s *payloadSizeLimiter) prepareFirstChild() {
