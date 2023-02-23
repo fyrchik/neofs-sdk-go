@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"testing"
 
+	cid "github.com/TrueCloudLab/frostfs-sdk-go/container/id"
 	cidtest "github.com/TrueCloudLab/frostfs-sdk-go/container/id/test"
 	objectSDK "github.com/TrueCloudLab/frostfs-sdk-go/object"
 	"github.com/TrueCloudLab/frostfs-sdk-go/version"
@@ -18,23 +19,13 @@ func TestTransformer(t *testing.T) {
 
 	target, _ := newPayloadSizeLimiter(maxSize, tt)
 
-	ver := version.Current()
 	cnr := cidtest.ID()
-	hdr := objectSDK.New()
-	hdr.SetContainerID(cnr)
-	hdr.SetType(objectSDK.TypeRegular)
-	hdr.SetVersion(&ver)
-	require.NoError(t, target.WriteHeader(hdr))
+	hdr := newObject(cnr)
 
 	expectedPayload := make([]byte, maxSize*2+maxSize/2)
 	_, _ = rand.Read(expectedPayload)
 
-	_, err := target.Write(expectedPayload)
-	require.NoError(t, err)
-
-	ids, err := target.Close()
-	require.NoError(t, err)
-
+	ids := writeObject(t, target, hdr, expectedPayload)
 	require.Equal(t, 4, len(tt.objects)) // 3 parts + linking object
 
 	var actualPayload []byte
@@ -62,13 +53,29 @@ func TestTransformer(t *testing.T) {
 	require.Equal(t, expectedPayload, actualPayload)
 }
 
-func BenchmarkTransformer(b *testing.B) {
+func newObject(cnr cid.ID) *objectSDK.Object {
 	ver := version.Current()
-	cnr := cidtest.ID()
 	hdr := objectSDK.New()
 	hdr.SetContainerID(cnr)
 	hdr.SetType(objectSDK.TypeRegular)
 	hdr.SetVersion(&ver)
+	return hdr
+}
+
+func writeObject(t *testing.T, target ObjectTarget, header *objectSDK.Object, payload []byte) *AccessIdentifiers {
+	require.NoError(t, target.WriteHeader(header))
+
+	_, err := target.Write(payload)
+	require.NoError(t, err)
+
+	ids, err := target.Close()
+	require.NoError(t, err)
+
+	return ids
+}
+
+func BenchmarkTransformer(b *testing.B) {
+	hdr := newObject(cidtest.ID())
 
 	b.Run("small", func(b *testing.B) {
 		benchmarkTransformer(b, hdr, 8*1024)
