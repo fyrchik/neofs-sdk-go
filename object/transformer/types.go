@@ -16,6 +16,11 @@ type AccessIdentifiers struct {
 	ParentHeader *object.Object
 }
 
+// EpochSource is a source for the current epoch.
+type EpochSource interface {
+	CurrentEpoch() uint64
+}
+
 // ObjectTarget is an interface of the object writer.
 type ObjectTarget interface {
 	// WriteHeader writes object header w/ payload part.
