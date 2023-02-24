@@ -2,11 +2,13 @@ package transformer
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"testing"
 
 	cid "github.com/TrueCloudLab/frostfs-sdk-go/container/id"
 	cidtest "github.com/TrueCloudLab/frostfs-sdk-go/container/id/test"
 	objectSDK "github.com/TrueCloudLab/frostfs-sdk-go/object"
+	"github.com/TrueCloudLab/frostfs-sdk-go/user"
 	"github.com/TrueCloudLab/frostfs-sdk-go/version"
 	"github.com/nspcc-dev/neo-go/pkg/crypto/keys"
 	"github.com/stretchr/testify/require"
@@ -17,10 +19,14 @@ func TestTransformer(t *testing.T) {
 
 	tt := new(testTarget)
 
-	target, _ := newPayloadSizeLimiter(maxSize, tt)
+	target, pk := newPayloadSizeLimiter(maxSize, tt)
 
 	cnr := cidtest.ID()
 	hdr := newObject(cnr)
+
+	var owner user.ID
+	user.IDFromKey(&owner, pk.PrivateKey.PublicKey)
+	hdr.SetOwnerID(&owner)
 
 	expectedPayload := make([]byte, maxSize*2+maxSize/2)
 	_, _ = rand.Read(expectedPayload)
@@ -34,10 +40,19 @@ func TestTransformer(t *testing.T) {
 		require.True(t, ok)
 		require.Equal(t, cnr, childCnr)
 		require.Equal(t, objectSDK.TypeRegular, tt.objects[i].Type())
+		require.Equal(t, &owner, tt.objects[i].OwnerID())
 
 		payload := tt.objects[i].Payload()
 		require.EqualValues(t, tt.objects[i].PayloadSize(), len(payload))
 		actualPayload = append(actualPayload, payload...)
+
+		if len(payload) != 0 {
+			cs, ok := tt.objects[i].PayloadChecksum()
+			require.True(t, ok)
+
+			h := sha256.Sum256(payload)
+			require.Equal(t, h[:], cs.Value())
+		}
 
 		switch i {
 		case 0, 1:
@@ -51,6 +66,14 @@ func TestTransformer(t *testing.T) {
 		}
 	}
 	require.Equal(t, expectedPayload, actualPayload)
+
+	t.Run("parent checksum", func(t *testing.T) {
+		cs, ok := ids.ParentHeader.PayloadChecksum()
+		require.True(t, ok)
+
+		h := sha256.Sum256(expectedPayload)
+		require.Equal(t, h[:], cs.Value())
+	})
 }
 
 func newObject(cnr cid.ID) *objectSDK.Object {
