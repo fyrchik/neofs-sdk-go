@@ -21,7 +21,7 @@ type payloadSizeLimiter struct {
 
 	current, parent *object.Object
 
-	currentHashers, parentHashers []*payloadChecksumHasher
+	currentHashers, parentHashers []payloadChecksumHasher
 
 	previous []oid.ID
 
@@ -83,7 +83,7 @@ func (s *payloadSizeLimiter) initialize() {
 		// initialize parent object once (after 1st object)
 		if ln == 1 {
 			s.parent = fromObject(s.current)
-			s.parentHashers = s.currentHashers
+			s.parentHashers = append(s.parentHashers[:0], s.currentHashers...)
 
 			// return source attributes
 			s.parent.SetAttributes(s.parAttrs...)
@@ -117,7 +117,7 @@ func fromObject(obj *object.Object) *object.Object {
 func (s *payloadSizeLimiter) initializeCurrent() {
 	// create payload hashers
 	s.writtenCurrent = 0
-	s.currentHashers = payloadHashersForObject(s.WithoutHomomorphicHash)
+	s.initPayloadHashers()
 
 	// compose multi-writer from target and all payload hashers
 	ws := make([]io.Writer, 0, 1+len(s.currentHashers)+len(s.parentHashers))
@@ -135,22 +135,18 @@ func (s *payloadSizeLimiter) initializeCurrent() {
 	s.chunkWriter = io.MultiWriter(ws...)
 }
 
-func payloadHashersForObject(withoutHomomorphicHash bool) []*payloadChecksumHasher {
-	hashers := make([]*payloadChecksumHasher, 0, 2)
-
-	hashers = append(hashers, &payloadChecksumHasher{
+func (s *payloadSizeLimiter) initPayloadHashers() {
+	s.currentHashers = append(s.currentHashers[:0], payloadChecksumHasher{
 		hasher: sha256.New(),
 		typ:    checksum.SHA256,
 	})
 
-	if !withoutHomomorphicHash {
-		hashers = append(hashers, &payloadChecksumHasher{
+	if !s.WithoutHomomorphicHash {
+		s.currentHashers = append(s.currentHashers, payloadChecksumHasher{
 			hasher: tz.New(),
 			typ:    checksum.TZ,
 		})
 	}
-
-	return hashers
 }
 
 func (s *payloadSizeLimiter) release(finalize bool) (*AccessIdentifiers, error) {
