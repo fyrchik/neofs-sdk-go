@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"fmt"
-	"io"
 
 	"github.com/TrueCloudLab/frostfs-sdk-go/checksum"
 	"github.com/TrueCloudLab/frostfs-sdk-go/object"
@@ -24,8 +23,6 @@ type payloadSizeLimiter struct {
 	currentHashers, parentHashers []payloadChecksumHasher
 
 	previous []oid.ID
-
-	chunkWriter io.Writer
 
 	splitID *object.SplitID
 
@@ -118,21 +115,6 @@ func (s *payloadSizeLimiter) initializeCurrent() {
 	// create payload hashers
 	s.writtenCurrent = 0
 	s.initPayloadHashers()
-
-	// compose multi-writer from target and all payload hashers
-	ws := make([]io.Writer, 0, 1+len(s.currentHashers)+len(s.parentHashers))
-
-	ws = append(ws, s.NextTarget)
-
-	for i := range s.currentHashers {
-		ws = append(ws, s.currentHashers[i].hasher)
-	}
-
-	for i := range s.parentHashers {
-		ws = append(ws, s.parentHashers[i].hasher)
-	}
-
-	s.chunkWriter = io.MultiWriter(ws...)
 }
 
 func (s *payloadSizeLimiter) initPayloadHashers() {
@@ -269,7 +251,7 @@ func (s *payloadSizeLimiter) writeChunk(chunk []byte) error {
 			cut = leftToEdge
 		}
 
-		if _, err := s.chunkWriter.Write(chunk[:cut]); err != nil {
+		if err := s.writeHashes(chunk[:cut]); err != nil {
 			return fmt.Errorf("could not write chunk to target: %w", err)
 		}
 
@@ -283,6 +265,24 @@ func (s *payloadSizeLimiter) writeChunk(chunk []byte) error {
 		// if there are more bytes in buffer we call method again to start filling another object
 		chunk = chunk[cut:]
 	}
+}
+
+func (s *payloadSizeLimiter) writeHashes(chunk []byte) error {
+	_, err := s.NextTarget.Write(chunk)
+	if err != nil {
+		return err
+	}
+
+	// The `Write` method of `hash.Hash` never returns an error.
+	for i := range s.currentHashers {
+		_, _ = s.currentHashers[i].hasher.Write(chunk)
+	}
+
+	for i := range s.parentHashers {
+		_, _ = s.parentHashers[i].hasher.Write(chunk)
+	}
+
+	return nil
 }
 
 func (s *payloadSizeLimiter) prepareFirstChild() {
