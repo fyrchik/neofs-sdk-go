@@ -182,12 +182,7 @@ func (tt *testTarget) Write(p []byte) (n int, err error) {
 
 func (tt *testTarget) Close() (*AccessIdentifiers, error) {
 	tt.current.SetPayload(tt.payload)
-	// We need to marshal, because current implementation reuses written object.
-	data, _ := tt.current.Marshal()
-	obj := objectSDK.New()
-	_ = obj.Unmarshal(data)
-
-	tt.objects = append(tt.objects, obj)
+	tt.objects = append(tt.objects, tt.current)
 	tt.current = nil
 	tt.payload = nil
 	return nil, nil // AccessIdentifiers should not be used.

@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"fmt"
-	"hash"
 	"io"
 
 	"github.com/TrueCloudLab/frostfs-sdk-go/checksum"
@@ -31,12 +30,6 @@ type payloadSizeLimiter struct {
 	splitID *object.SplitID
 
 	parAttrs []object.Attribute
-}
-
-type payloadChecksumHasher struct {
-	hasher hash.Hash
-
-	checksumWriter func([]byte)
 }
 
 type Params struct {
@@ -83,11 +76,17 @@ func (s *payloadSizeLimiter) Close() (*AccessIdentifiers, error) {
 }
 
 func (s *payloadSizeLimiter) initialize() {
+	s.current = fromObject(s.current)
+
 	// if it is an object after the 1st
 	if ln := len(s.previous); ln > 0 {
 		// initialize parent object once (after 1st object)
 		if ln == 1 {
-			s.detachParent()
+			s.parent = fromObject(s.current)
+			s.parentHashers = s.currentHashers
+
+			// return source attributes
+			s.parent.SetAttributes(s.parAttrs...)
 		}
 
 		// set previous object to the last previous identifier
@@ -118,7 +117,7 @@ func fromObject(obj *object.Object) *object.Object {
 func (s *payloadSizeLimiter) initializeCurrent() {
 	// create payload hashers
 	s.writtenCurrent = 0
-	s.currentHashers = payloadHashersForObject(s.current, s.WithoutHomomorphicHash)
+	s.currentHashers = payloadHashersForObject(s.WithoutHomomorphicHash)
 
 	// compose multi-writer from target and all payload hashers
 	ws := make([]io.Writer, 0, 1+len(s.currentHashers)+len(s.parentHashers))
@@ -136,42 +135,18 @@ func (s *payloadSizeLimiter) initializeCurrent() {
 	s.chunkWriter = io.MultiWriter(ws...)
 }
 
-func payloadHashersForObject(obj *object.Object, withoutHomomorphicHash bool) []*payloadChecksumHasher {
+func payloadHashersForObject(withoutHomomorphicHash bool) []*payloadChecksumHasher {
 	hashers := make([]*payloadChecksumHasher, 0, 2)
 
 	hashers = append(hashers, &payloadChecksumHasher{
 		hasher: sha256.New(),
-		checksumWriter: func(binChecksum []byte) {
-			if ln := len(binChecksum); ln != sha256.Size {
-				panic(fmt.Sprintf("wrong checksum length: expected %d, has %d", sha256.Size, ln))
-			}
-
-			csSHA := [sha256.Size]byte{}
-			copy(csSHA[:], binChecksum)
-
-			var cs checksum.Checksum
-			cs.SetSHA256(csSHA)
-
-			obj.SetPayloadChecksum(cs)
-		},
+		typ:    checksum.SHA256,
 	})
 
 	if !withoutHomomorphicHash {
 		hashers = append(hashers, &payloadChecksumHasher{
 			hasher: tz.New(),
-			checksumWriter: func(binChecksum []byte) {
-				if ln := len(binChecksum); ln != tz.Size {
-					panic(fmt.Sprintf("wrong checksum length: expected %d, has %d", tz.Size, ln))
-				}
-
-				csTZ := [tz.Size]byte{}
-				copy(csTZ[:], binChecksum)
-
-				var cs checksum.Checksum
-				cs.SetTillichZemor(csTZ)
-
-				obj.SetPayloadHomomorphicHash(cs)
-			},
+			typ:    checksum.TZ,
 		})
 	}
 
@@ -185,13 +160,17 @@ func (s *payloadSizeLimiter) release(finalize bool) (*AccessIdentifiers, error) 
 	withParent := finalize && len(s.previous) > 0
 
 	if withParent {
-		writeHashes(s.parentHashers)
+		for i := range s.parentHashers {
+			s.parentHashers[i].writeChecksum(s.parent)
+		}
 		s.parent.SetPayloadSize(s.written)
 		s.current.SetParent(s.parent)
 	}
 
 	// release current object
-	writeHashes(s.currentHashers)
+	for i := range s.currentHashers {
+		s.currentHashers[i].writeChecksum(s.current)
+	}
 
 	curEpoch := s.NetworkState.CurrentEpoch()
 	ver := version.Current()
@@ -259,12 +238,6 @@ func (s *payloadSizeLimiter) release(finalize bool) (*AccessIdentifiers, error) 
 	return ids, nil
 }
 
-func writeHashes(hashers []*payloadChecksumHasher) {
-	for i := range hashers {
-		hashers[i].checksumWriter(hashers[i].hasher.Sum(nil))
-	}
-}
-
 func (s *payloadSizeLimiter) initializeLinking(parHdr *object.Object) {
 	s.current = fromObject(s.current)
 	s.current.SetParent(parHdr)
@@ -326,15 +299,4 @@ func (s *payloadSizeLimiter) prepareFirstChild() {
 	s.current.SetAttributes()
 
 	// attributes will be added to parent in detachParent
-}
-
-func (s *payloadSizeLimiter) detachParent() {
-	s.parent = s.current
-	s.current = fromObject(s.parent)
-	s.parent.ResetRelations()
-	s.parent.SetSignature(nil)
-	s.parentHashers = s.currentHashers
-
-	// return source attributes
-	s.parent.SetAttributes(s.parAttrs...)
 }
